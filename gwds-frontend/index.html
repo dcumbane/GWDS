@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gaza Water Data System</title>
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<header class="navbar">
+  <div class="brand">
+    <span class="logo">💧</span>
+    <div>
+      <h1>Gaza Water Data System</h1>
+      <small>DPOPHRH Gaza · v1.0</small>
+    </div>
+  </div>
+  <nav id="nav" class="nav hidden"></nav>
+  <div id="userbar" class="userbar"></div>
+</header>
+
+<main id="app" class="container">
+  <div class="loading" id="loading">A carregar…</div>
+</main>
+
+<footer class="footer">
+  <small>Gaza Water Data System · TFC de Dionísio Pita Cumbane (UnISCED, 2026)</small>
+</footer>
+
+<!-- Detecta abertura via file:// (módulos ES6 não funcionam assim) -->
+<script>
+(function () {
+  if (location.protocol === 'file:') {
+    document.getElementById('app').innerHTML = `
+      <div style="max-width:680px;margin:2rem auto;padding:1.5rem;border-radius:10px;background:#FEF3C7;border-left:6px solid #D97706;">
+        <h2 style="margin-top:0;color:#92400E;">É preciso abrir com um servidor local</h2>
+        <p>Os navegadores modernos bloqueiam módulos JavaScript quando a página é aberta directamente do disco (URL <code>file://</code>). Esta SPA usa módulos ES6, por isso precisa de ser servida via <code>http://</code>.</p>
+        <h3 style="color:#92400E;">Três formas, escolha uma</h3>
+        <ol style="line-height:1.7;">
+          <li><strong>Mais fácil:</strong> Faça duplo clique em <code>start-windows.bat</code> (precisa de Python 3 instalado). Abre o navegador automaticamente em <code>http://localhost:8000</code>.</li>
+          <li><strong>VS Code:</strong> Instale a extensão <em>Live Server</em> (Ritwick Dey), abra a pasta <code>gwds-frontend/</code>, clique direito no <code>index.html</code> e escolha <em>Open with Live Server</em>.</li>
+          <li><strong>Linha de comando:</strong> Na pasta <code>gwds-frontend/</code>, corra
+            <code style="display:block;background:#FFF;padding:0.5rem;margin-top:0.4rem;border-radius:4px;">python -m http.server 8000</code>
+            e abra <code>http://localhost:8000</code> no navegador.</li>
+        </ol>
+        <p style="color:#92400E;margin-top:1rem;"><strong>Após o deploy:</strong> quando o site for publicado no GitHub Pages, este aviso desaparece e funciona normalmente em qualquer navegador.</p>
+      </div>`;
+    return;
+  }
+  // Caso esteja em http(s)://, carrega a SPA normalmente
+  var s = document.createElement('script');
+  s.type = 'module';
+  s.src = 'js/main.js';
+  document.body.appendChild(s);
+})();
+</script>
+
+</body>
+</html>
