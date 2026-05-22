@@ -1,62 +1,147 @@
-import { CONFIG } from './config.js';
+/**
+ * Camada de comunicação com a Web App do Apps Script.
+ *
+ * Por causa do redirect interno do Apps Script de script.google.com
+ * para script.googleusercontent.com, fetch() cross-origin falha por
+ * ausência de header Access-Control-Allow-Origin. A solução padrão
+ * é JSONP: injectar uma <script> que carrega "exec?_callback=fn".
+ * O Apps Script devolve um script "fn({...})" e o navegador executa-o.
+ *
+ * Vantagens: funciona sempre, sem proxy, sem alterações de domínio.
+ * Limites: o "body" vai por query string, com tecto à volta de 8 KB
+ * em navegadores modernos. Para fotografias grandes, ver upload abaixo.
+ */
 
-async function request(method, path, body, params) {
-  const url = new URL(CONFIG.API_BASE);
-  url.searchParams.set('_path', path);
-  if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v); });
+let _seq = 0;
 
-  const opts = { method, redirect: 'follow' };
-  if (body) {
-    // Apps Script aceita JSON via raw body em doPost; para evitar pré-flight CORS, usamos text/plain.
-    opts.body = JSON.stringify(body);
-    opts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
-  }
-  const res = await fetch(url, opts);
-  const text = await res.text();
-  let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
-  if (!res.ok || (data && data.status >= 400)) {
-    const err = new Error(data?.detail || data?.title || `HTTP ${res.status}`);
-    err.status = data?.status || res.status;
-    err.payload = data;
-    throw err;
-  }
-  return data;
+function jsonp(path, payload) {
+  return new Promise((resolve, reject) => {
+    if (!CONFIG.API_BASE || CONFIG.API_BASE.indexOf('AKfycb') === -1) {
+      return reject(new Error('API_BASE não configurado em js/config.js'));
+    }
+    const cbName = '__gwds_cb_' + (++_seq) + '_' + Date.now();
+    const url = new URL(CONFIG.API_BASE);
+    url.searchParams.set('_path', path);
+    url.searchParams.set('_callback', cbName);
+    if (payload) url.searchParams.set('_payload', JSON.stringify(payload));
+
+    const script = document.createElement('script');
+    let done = false;
+    const cleanup = () => {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true; cleanup();
+      reject(new Error('Tempo esgotado (30 s) ao contactar a Web App. Confirme o URL em config.js.'));
+    }, 30000);
+
+    window[cbName] = (data) => {
+      done = true; clearTimeout(timer); cleanup();
+      if (data && data.status >= 400) {
+        const err = new Error(data.detail || data.title || 'Erro');
+        err.status = data.status; err.payload = data;
+        reject(err);
+      } else {
+        resolve(data);
+      }
+    };
+    script.onerror = () => {
+      if (done) return;
+      done = true; clearTimeout(timer); cleanup();
+      reject(new Error('Falha de rede ao carregar a Web App.'));
+    };
+    script.src = url.toString();
+    document.head.appendChild(script);
+  });
+}
+
+/**
+ * Upload de fotografia via formulário oculto + iframe.
+ * Necessário porque base64 grande não cabe em querystring.
+ */
+function formUpload(path, payload) {
+  return new Promise((resolve, reject) => {
+    const iframeName = '__gwds_iframe_' + Date.now();
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeName;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = CONFIG.API_BASE + '?_path=' + encodeURIComponent(path);
+    form.target = iframeName;
+    form.enctype = 'application/x-www-form-urlencoded';
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify(payload);
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    iframe.onload = () => {
+      try {
+        const text = iframe.contentDocument && iframe.contentDocument.body && iframe.contentDocument.body.innerText;
+        const data = JSON.parse(text);
+        document.body.removeChild(iframe);
+        document.body.removeChild(form);
+        if (data && data.status >= 400) {
+          const err = new Error(data.detail || data.title || 'Erro');
+          err.status = data.status; err.payload = data; reject(err);
+        } else resolve(data);
+      } catch (e) {
+        document.body.removeChild(iframe);
+        document.body.removeChild(form);
+        reject(new Error('Resposta inválida do servidor.'));
+      }
+    };
+    form.submit();
+  });
+}
+
+async function call(path, payload, opts) {
+  opts = opts || {};
+  if (opts.upload) return formUpload(path, payload || {});
+  return jsonp(path, payload);
 }
 
 export const Api = {
-  me:     () => request('GET',  'auth/me'),
+  me:     () => call('auth/me'),
   fontes: {
-    list:   (filtros) => request('GET',  'fontes', null, filtros),
-    get:    (codigo)  => request('GET',  'fontes/get', null, { codigo }),
-    create: (body)    => request('POST', 'fontes', body),
-    update: (codigo, body) => request('POST', 'fontes/update', body, { codigo }),
-    remove: (codigo)  => request('POST', 'fontes/delete', null, { codigo })
+    list:   (filtros) => call('fontes/list', filtros || {}),
+    get:    (codigo)  => call('fontes/get', { codigo }),
+    create: (body)    => call('fontes/create', body, { upload: !!body.foto_base64 }),
+    update: (codigo, body) => call('fontes/update', Object.assign({ codigo }, body)),
+    remove: (codigo)  => call('fontes/delete', { codigo })
   },
   saa: {
-    list:   (filtros) => request('GET',  'saa', null, filtros),
-    get:    (codigo)  => request('GET',  'saa/get', null, { codigo }),
-    create: (body)    => request('POST', 'saa', body),
-    update: (codigo, body) => request('POST', 'saa/update', body, { codigo }),
-    remove: (codigo)  => request('POST', 'saa/delete', null, { codigo })
+    list:   (filtros) => call('saa/list', filtros || {}),
+    get:    (codigo)  => call('saa/get', { codigo }),
+    create: (body)    => call('saa/create', body),
+    update: (codigo, body) => call('saa/update', Object.assign({ codigo }, body)),
+    remove: (codigo)  => call('saa/delete', { codigo })
   },
   monitorias: {
-    list:   (filtros) => request('GET',  'monitorias', null, filtros),
-    bySaa:  (codigo)  => request('GET',  'monitorias/by-saa', null, { codigo }),
-    create: (body)    => request('POST', 'monitorias', body)
+    list:   (filtros) => call('monitorias/list', filtros || {}),
+    bySaa:  (codigo)  => call('monitorias/by-saa', { codigo }),
+    create: (body)    => call('monitorias/create', body)
   },
   dashboards: {
-    kpis:  (filtros) => request('GET', 'dashboards/kpis', null, filtros),
-    serie: (filtros) => request('GET', 'dashboards/serie', null, filtros),
-    mapa:  (filtros) => request('GET', 'dashboards/mapa', null, filtros)
+    kpis:  (filtros) => call('dashboards/kpis', filtros || {}),
+    serie: (filtros) => call('dashboards/serie', filtros || {}),
+    mapa:  (filtros) => call('dashboards/mapa', filtros || {})
   },
   cascade: {
-    all:     () => request('GET',  'cascade/all'),
-    validar: (q) => request('GET', 'cascade/validar', null, q),
-    upload:  (rows) => request('POST', 'admin/cascade/upload', { rows })
+    all:     () => call('cascade/all'),
+    validar: (q) => call('cascade/validar', q),
+    upload:  (rows) => call('admin/cascade/upload', { rows }, { upload: true })
   },
   admin: {
-    users:   () => request('GET',  'admin/users'),
-    upsert:  (u) => request('POST', 'admin/users', u)
+    users:   () => call('admin/users'),
+    upsert:  (u) => call('admin/users/upsert', u)
   },
-  export: (q) => request('GET', 'export', null, q)
+  export: (q) => call('export', q || {})
 };
+
