@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gaza Water Data System</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --c-primary: #1F4E79; --c-primary-light: #2E75B6; --c-bg: #F8FAFC;
+  --c-card: #FFFFFF; --c-text: #1F2937; --c-muted: #6B7280;
+  --c-border: #E5E7EB; --c-success: #16A34A; --c-danger: #DC2626;
+  --c-warning: #D97706; --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--c-text); background: var(--c-bg); }
+.hidden { display: none !important; }
+.navbar { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.5rem; background: var(--c-primary); color: white; box-shadow: var(--shadow); }
+.brand { display: flex; align-items: center; gap: 0.75rem; }
+.brand .logo { font-size: 2rem; }
+.brand h1 { font-size: 1.1rem; margin: 0; font-weight: 700; }
+.brand small { opacity: 0.85; font-size: 0.75rem; }
+.nav { display: flex; gap: 1rem; }
+.nav a { color: white; text-decoration: none; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.9rem; opacity: 0.85; }
+.nav a:hover, .nav a.active { background: rgba(255,255,255,0.15); opacity: 1; }
+.userbar { font-size: 0.85rem; display: flex; align-items: center; gap: 0.75rem; }
+.userbar .badge { background: rgba(255,255,255,0.18); padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.75rem; }
+.container { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+.loading { text-align: center; color: var(--c-muted); padding: 3rem; }
+.card { background: var(--c-card); padding: 1.25rem; border-radius: 10px; border: 1px solid var(--c-border); box-shadow: var(--shadow); margin-bottom: 1rem; }
+.card h2 { margin: 0 0 1rem; color: var(--c-primary); font-size: 1.2rem; }
+.card h3 { margin: 1rem 0 0.5rem; color: var(--c-primary-light); font-size: 1rem; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.kpi { background: var(--c-card); padding: 1rem; border-radius: 10px; border-left: 4px solid var(--c-primary); box-shadow: var(--shadow); }
+.kpi .label { font-size: 0.8rem; color: var(--c-muted); margin-bottom: 0.25rem; }
+.kpi .value { font-size: 1.75rem; font-weight: 700; color: var(--c-primary); }
+.kpi.success { border-left-color: var(--c-success); }
+.kpi.success .value { color: var(--c-success); }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem 1rem; }
+.field { display: flex; flex-direction: column; gap: 0.25rem; }
+.field.full { grid-column: 1 / -1; }
+label { font-size: 0.8rem; font-weight: 600; color: var(--c-muted); }
+label .req { color: var(--c-danger); }
+input, select, textarea { padding: 0.5rem 0.65rem; border: 1px solid var(--c-border); border-radius: 6px; font-size: 0.9rem; font-family: inherit; background: white; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--c-primary-light); border-color: var(--c-primary-light); }
+textarea { resize: vertical; min-height: 60px; }
+.btn { padding: 0.55rem 1.1rem; border-radius: 6px; border: 0; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: filter 0.15s; }
+.btn-primary { background: var(--c-primary); color: white; }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-secondary { background: var(--c-border); color: var(--c-text); }
+.btn-danger { background: var(--c-danger); color: white; }
+.toolbar { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+.toolbar input { flex: 1; min-width: 220px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: white; border: 1px solid var(--c-border); border-radius: 8px; overflow: hidden; }
+th, td { padding: 0.55rem 0.75rem; text-align: left; border-bottom: 1px solid var(--c-border); }
+th { background: var(--c-primary); color: white; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+tr:hover { background: var(--c-bg); }
+.tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+.tag.operacional { background: #DCFCE7; color: #166534; }
+.tag.avariado { background: #FEE2E2; color: #991B1B; }
+.tag.parcial { background: #FEF3C7; color: #92400E; }
+.alert { padding: 0.85rem 1rem; border-radius: 6px; margin: 0.75rem 0; }
+.alert-error { background: #FEE2E2; color: #991B1B; border-left: 4px solid var(--c-danger); }
+.alert-success { background: #DCFCE7; color: #166534; border-left: 4px solid var(--c-success); }
+.alert-info { background: #DBEAFE; color: #1E40AF; border-left: 4px solid var(--c-primary-light); }
+#mapa { height: 420px; border-radius: 8px; overflow: hidden; border: 1px solid var(--c-border); }
+.footer { text-align: center; color: var(--c-muted); padding: 1.5rem; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<header class="navbar">
+  <div class="brand">
+    <span class="logo">💧</span>
+    <div>
+      <h1>Gaza Water Data System</h1>
+      <small>DPOPHRH Gaza · v1.0</small>
+    </div>
+  </div>
+  <nav id="nav" class="nav hidden"></nav>
+  <div id="userbar" class="userbar"></div>
+</header>
+
+<main id="app" class="container">
+  <div class="loading">A carregar…</div>
+</main>
+
+<footer class="footer">
+  <small>Gaza Water Data System · TFC de Dionísio Pita Cumbane (UnISCED, 2026)</small>
+</footer>
+
+<script>
+// ===================== CONFIG =====================
+const CONFIG = {
+  ORGANIZATION: 'Direcção Provincial de Obras Públicas, Habitação e Recursos Hídricos de Gaza'
+};
+
+// ===================== API (mesmo origem, sem CORS) =====================
+async function apiCall(path, payload, opts) {
+  opts = opts || {};
+  const url = window.location.pathname + '?_path=' + encodeURIComponent(path);
+  const init = { method: 'POST', credentials: 'same-origin' };
+  init.body = JSON.stringify(payload || {});
+  init.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
+  const res = await fetch(url, init);
+  const text = await res.text();
+  let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  if (!res.ok || (data && data.status >= 400)) {
+    const err = new Error((data && (data.detail || data.title)) || ('HTTP ' + res.status));
+    err.status = (data && data.status) || res.status;
+    err.payload = data;
+    throw err;
+  }
+  return data;
+}
+
+const Api = {
+  me:     () => apiCall('auth/me'),
+  fontes: {
+    list:   (f) => apiCall('fontes/list', f || {}),
+    get:    (codigo) => apiCall('fontes/get', { codigo }),
+    create: (b) => apiCall('fontes/create', b),
+    update: (codigo, b) => apiCall('fontes/update', Object.assign({ codigo }, b)),
+    remove: (codigo) => apiCall('fontes/delete', { codigo })
+  },
+  saa: {
+    list:   (f) => apiCall('saa/list', f || {}),
+    get:    (codigo) => apiCall('saa/get', { codigo }),
+    create: (b) => apiCall('saa/create', b),
+    update: (codigo, b) => apiCall('saa/update', Object.assign({ codigo }, b)),
+    remove: (codigo) => apiCall('saa/delete', { codigo })
+  },
+  monitorias: {
+    list:   (f) => apiCall('monitorias/list', f || {}),
+    bySaa:  (codigo) => apiCall('monitorias/by-saa', { codigo }),
+    create: (b) => apiCall('monitorias/create', b)
+  },
+  dashboards: {
+    kpis:  (f) => apiCall('dashboards/kpis', f || {}),
+    serie: (f) => apiCall('dashboards/serie', f || {}),
+    mapa:  (f) => apiCall('dashboards/mapa', f || {})
+  },
+  cascade: {
+    all:     () => apiCall('cascade/all'),
+    validar: (q) => apiCall('cascade/validar', q),
+    upload:  (rows) => apiCall('admin/cascade/upload', { rows })
+  },
+  admin: {
+    users:   () => apiCall('admin/users'),
+    upsert:  (u) => apiCall('admin/users/upsert', u)
+  },
+  exportar: (q) => apiCall('export', q || {})
+};
+
+// ===================== AUTH =====================
+let _user = null;
+const Auth = {
+  current() { return _user; },
+  async load() { _user = await Api.me(); return _user; },
+  hasPerfil(...p) { return _user && p.includes(_user.perfil); },
+  logout() { _user = null; location.hash = '#/login'; }
+};
+
+// ===================== GEO =====================
+function wgs84ToUtm(lon, lat) {
+  if (lon === '' || lat === '') return { x: '', y: '', zone: '' };
+  lon = Number(lon); lat = Number(lat);
+  const a = 6378137.0, f = 1/298.257223563;
+  const eSq = f * (2 - f);
+  const ePrimeSq = eSq / (1 - eSq);
+  const k0 = 0.9996;
+  const zone = Math.floor((lon + 180) / 6) + 1;
+  const lon0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180;
+  const phi = lat * Math.PI / 180;
+  const lam = lon * Math.PI / 180;
+  const N = a / Math.sqrt(1 - eSq * Math.sin(phi) ** 2);
+  const T = Math.tan(phi) ** 2;
+  const C = ePrimeSq * Math.cos(phi) ** 2;
+  const A = Math.cos(phi) * (lam - lon0);
+  const M = a * ((1 - eSq/4 - 3*eSq*eSq/64) * phi - (3*eSq/8 + 3*eSq*eSq/32) * Math.sin(2*phi));
+  const x = k0 * N * (A + (1 - T + C) * A**3/6) + 500000;
+  let y = k0 * (M + N * Math.tan(phi) * (A*A/2 + (5 - T + 9*C) * A**4/24));
+  if (lat < 0) y += 10000000;
+  return { x: Math.round(x*1000)/1000, y: Math.round(y*1000)/1000, zone: zone + 'S' };
+}
+
+// ===================== EXPORT =====================
+const Exportar = {
+  async pdf(entidade, filtros = {}) {
+    const { rows, headers } = await Api.exportar({ entidade, ...filtros });
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    doc.setFontSize(14); doc.text('Gaza Water Data System', 40, 40);
+    doc.setFontSize(10);
+    doc.text(CONFIG.ORGANIZATION, 40, 56);
+    doc.text(`Listagem: ${entidade.toUpperCase()}   Gerado em: ${new Date().toLocaleString('pt-PT')}`, 40, 72);
+    const body = rows.map(r => headers.map(h => String(r[h] ?? '')));
+    doc.autoTable({ head: [headers], body, startY: 90, theme: 'grid', styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [31,78,121] } });
+    doc.save(`gwds_${entidade}_${Date.now()}.pdf`);
+  },
+  async xlsx(entidade, filtros = {}) {
+    const { rows, headers } = await Api.exportar({ entidade, ...filtros });
+    const data = [headers, ...rows.map(r => headers.map(h => r[h] ?? ''))];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, entidade);
+    XLSX.writeFile(wb, `gwds_${entidade}_${Date.now()}.xlsx`);
+  }
+};
+
+// ===================== VIEWS =====================
+function renderLogin(app) {
+  app.innerHTML = `
+    <div class="card" style="max-width:480px;margin:3rem auto;text-align:center;padding:2rem;">
+      <h2>Bem-vindo ao Gaza Water Data System</h2>
+      <p>Sistema de recolha, análise e visualização de dados de infraestruturas de abastecimento de água da ${CONFIG.ORGANIZATION}.</p>
+      <p>Carregando autenticação…</p>
+    </div>`;
+  // Aqui dentro do iframe a sessão Google funciona nativamente. Apenas recarregar.
+  setTimeout(() => { location.hash = '#/dashboard'; }, 500);
+}
+
+let _chart, _map, _markers;
+async function renderDashboard(app) {
+  app.innerHTML = `
+    <h2 style="margin:0 0 1rem; color:var(--c-primary);">Dashboard provincial</h2>
+    <div class="toolbar">
+      <select id="f-distrito">
+        <option value="">Todos os distritos</option>
+        <option>Bilene</option><option>Chibuto</option><option>Chicualacuala</option>
+        <option>Chigubo</option><option>Chókwè</option><option>Chongoene</option>
+        <option>Guijá</option><option>Limpopo</option><option>Mabalane</option>
+        <option>Mandlakazi</option><option>Massangena</option><option>Massingir</option>
+        <option>Xai-Xai</option>
+      </select>
+      <button class="btn btn-primary" id="btn-refresh">Aplicar filtro</button>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Fontes dispersas</div><div class="value" id="kpi-fontes">…</div></div>
+      <div class="kpi success"><div class="label">SAA operacionais</div><div class="value" id="kpi-saa-op">…</div></div>
+      <div class="kpi"><div class="label">SAA totais</div><div class="value" id="kpi-saa">…</div></div>
+      <div class="kpi"><div class="label">% Operacionais</div><div class="value" id="kpi-pct">…</div></div>
+      <div class="kpi"><div class="label">Famílias beneficiárias</div><div class="value" id="kpi-fami">…</div></div>
+      <div class="kpi"><div class="label">Pessoas beneficiárias</div><div class="value" id="kpi-pess">…</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><h3>Fontes por tipo</h3><canvas id="ch-tipos" height="220"></canvas></div>
+      <div class="card"><h3>Mapa de pontos</h3><div id="mapa"></div></div>
+    </div>`;
+
+  const loadAll = async () => {
+    const distrito = document.getElementById('f-distrito').value;
+    const [k, m] = await Promise.all([Api.dashboards.kpis({ distrito }), Api.dashboards.mapa({ distrito })]);
+    document.getElementById('kpi-fontes').textContent = k.totalFontes;
+    document.getElementById('kpi-saa-op').textContent = k.operacionais;
+    document.getElementById('kpi-saa').textContent = k.totalSAA;
+    document.getElementById('kpi-pct').textContent = k.percentOperacionais + '%';
+    document.getElementById('kpi-fami').textContent = k.beneficiariosFamilias.toLocaleString('pt-PT');
+    document.getElementById('kpi-pess').textContent = k.beneficiariosPessoas.toLocaleString('pt-PT');
+    const labels = Object.keys(k.fontesPorTipo);
+    const data = labels.map(l => k.fontesPorTipo[l]);
+    if (_chart) _chart.destroy();
+    _chart = new Chart(document.getElementById('ch-tipos'), {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, backgroundColor: ['#1F4E79','#2E75B6','#5B9BD5','#9DC3E6','#BDD7EE','#DEEBF7'] }] },
+      options: { plugins: { legend: { position: 'right' } } }
+    });
+    if (!_map) {
+      _map = L.map('mapa').setView([-24.5, 33.2], 8);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(_map);
+      _markers = L.layerGroup().addTo(_map);
+    }
+    _markers.clearLayers();
+    m.points.forEach(p => {
+      const color = p.tipo === 'saa' ? '#1F4E79' : '#16A34A';
+      const mk = L.circleMarker([p.lat, p.lon], { radius: 6, color, weight: 2, fillOpacity: 0.7 });
+      mk.bindPopup(`<strong>${p.label || p.codigo}</strong><br>${p.tipo.toUpperCase()} · ${p.sub || ''}<br>${p.codigo}`);
+      _markers.addLayer(mk);
+    });
+  };
+  document.getElementById('btn-refresh').onclick = loadAll;
+  document.getElementById('f-distrito').onchange = loadAll;
+  await loadAll();
+}
+
+async function renderFontes(app) {
+  app.innerHTML = `
+    <h2 style="margin:0 0 1rem; color:var(--c-primary);">Fontes Dispersas</h2>
+    <div class="toolbar">
+      <input id="f-q" placeholder="Pesquisar…">
+      <select id="f-tipo"><option value="">Todos os tipos</option><option>Furo_Mecânico</option><option>Furo_Manual</option><option>Poço</option><option>Fontanário</option><option>Nascente</option></select>
+      <button class="btn btn-primary" id="b-filter">Filtrar</button>
+      ${Auth.hasPerfil('ADMINISTRADOR','TEC_CADASTRO') ? `<a class="btn btn-primary" href="#/fontes/nova">+ Nova fonte</a>` : ''}
+      <button class="btn btn-secondary" id="b-pdf">PDF</button>
+      <button class="btn btn-secondary" id="b-xlsx">Excel</button>
+    </div>
+    <div id="lista"></div>`;
+  const load = async () => {
+    const lista = document.getElementById('lista');
+    lista.innerHTML = '<div class="loading">A carregar…</div>';
+    const { items, total } = await Api.fontes.list({ q: document.getElementById('f-q').value, tipo: document.getElementById('f-tipo').value });
+    if (items.length === 0) { lista.innerHTML = '<div class="alert alert-info">Sem fontes.</div>'; return; }
+    lista.innerHTML = `<p style="color:var(--c-muted);">${total} resultado(s)</p>
+      <table><thead><tr><th>Código</th><th>Nome</th><th>Tipo</th><th>Distrito</th><th>Ano</th><th>Coords</th></tr></thead>
+      <tbody>${items.map(f => `<tr><td><strong>${f.codigo||''}</strong></td><td>${f.nome_lugar||''}</td><td>${f.tipo_fonte||''}</td><td>${f.distrito||''}</td><td>${f.ano_const||''}</td><td>${f.x_wgs84||''},${f.y_wgs84||''}</td></tr>`).join('')}</tbody></table>`;
+  };
+  document.getElementById('b-filter').onclick = load;
+  document.getElementById('b-pdf').onclick = () => Exportar.pdf('fonte', { tipo: document.getElementById('f-tipo').value });
+  document.getElementById('b-xlsx').onclick = () => Exportar.xlsx('fonte', { tipo: document.getElementById('f-tipo').value });
+  await load();
+}
+
+async function renderFonteForm(app) {
+  app.innerHTML = `
+    <div class="card"><h2>Cadastrar nova Fonte Dispersa</h2>
+    <form id="form">
+      <div class="field"><label>Província <span class="req">*</span></label><input name="provincia" value="Gaza" required></div>
+      <div class="field"><label>Distrito <span class="req">*</span></label><input name="distrito" required></div>
+      <div class="field"><label>Posto Administrativo <span class="req">*</span></label><input name="posto_adm" required></div>
+      <div class="field"><label>Localidade <span class="req">*</span></label><input name="localidade" required></div>
+      <div class="field"><label>Aldeia / Bairro</label><input name="aldei_bair"></div>
+      <div class="field"><label>Código <span class="req">*</span></label><input name="codigo" placeholder="090201/0001/2026" pattern="\\d{6}/\\d{4}/\\d{4}" required></div>
+      <div class="field"><label>Nome do lugar</label><input name="nome_lugar"></div>
+      <div class="field"><label>Tipo de fonte <span class="req">*</span></label><select name="tipo_fonte" required><option value="">--</option><option>Furo_Mecânico</option><option>Furo_Manual</option><option>Poço</option><option>Fontanário</option><option>Nascente</option></select></div>
+      <div class="field"><label>Ano de construção</label><input type="number" name="ano_const"></div>
+      <div class="field"><label>Empreiteiro</label><input name="nome_empre"></div>
+      <div class="field"><label>Financiador</label><input name="nome_finan"></div>
+      <div class="field"><label>Custo (MZN)</label><input type="number" step="0.01" name="custo_mzn"></div>
+      <div class="field"><label>Longitude WGS84 <span class="req">*</span></label><input type="number" step="0.0000001" name="x_wgs84" required id="lon"></div>
+      <div class="field"><label>Latitude WGS84 <span class="req">*</span></label><input type="number" step="0.0000001" name="y_wgs84" required id="lat"></div>
+      <div class="field"><label>X UTM</label><input name="x_utm" readonly></div>
+      <div class="field"><label>Y UTM</label><input name="y_utm" readonly></div>
+      <div class="field full"><label>Observações</label><textarea name="obs_lev"></textarea></div>
+      <div class="field full"><label>Fotografia (JPG/PNG)</label><input type="file" id="foto" accept="image/*"></div>
+      <div class="field full" style="display:flex;gap:0.5rem;"><button class="btn btn-primary" type="submit">Gravar</button><a class="btn btn-secondary" href="#/fontes">Cancelar</a></div>
+    </form><div id="msg"></div></div>`;
+  const lon = document.getElementById('lon'), lat = document.getElementById('lat');
+  const upd = () => { const u = wgs84ToUtm(lon.value, lat.value); document.querySelector('[name=x_utm]').value = u.x; document.querySelector('[name=y_utm]').value = u.y; };
+  lon.oninput = upd; lat.oninput = upd;
+  document.getElementById('form').onsubmit = async (e) => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target).entries());
+    const file = document.getElementById('foto').files[0];
+    if (file) body.foto_base64 = await new Promise(r => { const rd = new FileReader(); rd.onload = () => r(rd.result); rd.readAsDataURL(file); });
+    const msg = document.getElementById('msg'); msg.innerHTML = '<div class="loading">A submeter…</div>';
+    try { const r = await Api.fontes.create(body); msg.innerHTML = `<div class="alert alert-success">Fonte registada com código <strong>${r.codigo}</strong>.</div>`; e.target.reset(); }
+    catch (err) { msg.innerHTML = `<div class="alert alert-error"><strong>${err.payload?.title || 'Erro'}</strong>: ${err.message}</div>`; }
+  };
+}
+
+async function renderSaa(app) {
+  app.innerHTML = `
+    <h2 style="margin:0 0 1rem; color:var(--c-primary);">Sistemas de Abastecimento de Água</h2>
+    <div class="toolbar">
+      <input id="f-q" placeholder="Pesquisar…">
+      <button class="btn btn-primary" id="b-filter">Filtrar</button>
+      ${Auth.hasPerfil('ADMINISTRADOR','TEC_CADASTRO') ? `<a class="btn btn-primary" href="#/saa/novo">+ Novo SAA</a>` : ''}
+      <button class="btn btn-secondary" id="b-pdf">PDF</button>
+      <button class="btn btn-secondary" id="b-xlsx">Excel</button>
+    </div>
+    <div id="lista"></div>`;
+  const load = async () => {
+    const lista = document.getElementById('lista');
+    lista.innerHTML = '<div class="loading">A carregar…</div>';
+    const { items, total } = await Api.saa.list({ q: document.getElementById('f-q').value });
+    if (items.length === 0) { lista.innerHTML = '<div class="alert alert-info">Sem SAA registados.</div>'; return; }
+    lista.innerHTML = `<p style="color:var(--c-muted);">${total} resultado(s)</p>
+      <table><thead><tr><th>Código</th><th>Centro</th><th>Distrito</th><th>Rede</th><th>Captações</th><th>Reservatórios</th></tr></thead>
+      <tbody>${items.map(s => `<tr><td><strong>${s.codigo||''}</strong></td><td>${s.nomecentro||''}</td><td>${s.distrito||''}</td><td>${s.tipo_rede||''}</td><td>${s.n_capt||''}</td><td>${s.n_armaz||''}</td></tr>`).join('')}</tbody></table>`;
+  };
+  document.getElementById('b-filter').onclick = load;
+  document.getElementById('b-pdf').onclick = () => Exportar.pdf('saa');
+  document.getElementById('b-xlsx').onclick = () => Exportar.xlsx('saa');
+  await load();
+}
+
+async function renderSaaForm(app) {
+  app.innerHTML = `
+    <div class="card"><h2>Cadastrar novo SAA</h2>
+    <form id="form">
+      <div class="field"><label>Província <span class="req">*</span></label><input name="provincia" value="Gaza" required></div>
+      <div class="field"><label>Distrito <span class="req">*</span></label><input name="distrito" required></div>
+      <div class="field"><label>Posto Administrativo <span class="req">*</span></label><input name="posto_adm" required></div>
+      <div class="field"><label>Localidade <span class="req">*</span></label><input name="localidade" required></div>
+      <div class="field"><label>Código <span class="req">*</span></label><input name="codigo" pattern="\\d{6}/\\d{4}/\\d{4}" required></div>
+      <div class="field"><label>Nome do centro</label><input name="nomecentro"></div>
+      <div class="field"><label>Bairros</label><input name="bairros"></div>
+      <div class="field"><label>Ano de construção</label><input type="number" name="ano_const"></div>
+      <div class="field"><label>Propriedade</label><select name="propried"><option value="">--</option><option>Do_estado</option><option>Privada</option><option>Comunitária</option><option>Mista</option></select></div>
+      <div class="field"><label>N.º captações</label><input type="number" name="n_capt"></div>
+      <div class="field"><label>N.º reservatórios</label><input type="number" name="n_armaz"></div>
+      <div class="field"><label>Tipo de rede</label><select name="tipo_rede"><option value="">--</option><option>Ramificada</option><option>Malhada</option><option>Mista</option></select></div>
+      <div class="field"><label>Longitude WGS84 <span class="req">*</span></label><input type="number" step="0.0000001" name="x_wgs84" required id="lon"></div>
+      <div class="field"><label>Latitude WGS84 <span class="req">*</span></label><input type="number" step="0.0000001" name="y_wgs84" required id="lat"></div>
+      <div class="field full" style="display:flex;gap:0.5rem;"><button class="btn btn-primary" type="submit">Gravar</button><a class="btn btn-secondary" href="#/saa">Cancelar</a></div>
+    </form><div id="msg"></div></div>`;
+  document.getElementById('form').onsubmit = async (e) => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target).entries());
+    const msg = document.getElementById('msg'); msg.innerHTML = '<div class="loading">A submeter…</div>';
+    try { const r = await Api.saa.create(body); msg.innerHTML = `<div class="alert alert-success">SAA registado com código <strong>${r.codigo}</strong>.</div>`; e.target.reset(); }
+    catch (err) { msg.innerHTML = `<div class="alert alert-error"><strong>${err.payload?.title || 'Erro'}</strong>: ${err.message}</div>`; }
+  };
+}
+
+const tagEstado = (e) => { const c = e === 'Operacional' ? 'operacional' : e === 'Parcialmente Operacional' ? 'parcial' : 'avariado'; return `<span class="tag ${c}">${e || ''}</span>`; };
+
+async function renderMonitorias(app) {
+  app.innerHTML = `
+    <h2 style="margin:0 0 1rem; color:var(--c-primary);">Monitorias de SAA</h2>
+    <div class="toolbar">
+      <input id="f-saa" placeholder="Código do SAA">
+      <select id="f-estado"><option value="">Qualquer estado</option><option>Operacional</option><option>Parcialmente Operacional</option><option>Avariado</option><option>Desactivado</option></select>
+      <button class="btn btn-primary" id="b-filter">Filtrar</button>
+      ${Auth.hasPerfil('ADMINISTRADOR','TEC_MONITORIA','TEC_CADASTRO') ? `<a class="btn btn-primary" href="#/monitorias/nova">+ Nova monitoria</a>` : ''}
+    </div>
+    <div id="lista"></div>`;
+  const load = async () => {
+    const lista = document.getElementById('lista');
+    lista.innerHTML = '<div class="loading">A carregar…</div>';
+    const { items, total } = await Api.monitorias.list({ saa: document.getElementById('f-saa').value, estado: document.getElementById('f-estado').value });
+    if (items.length === 0) { lista.innerHTML = '<div class="alert alert-info">Sem monitorias.</div>'; return; }
+    lista.innerHTML = `<p style="color:var(--c-muted);">${total} resultado(s)</p>
+      <table><thead><tr><th>Data</th><th>SAA</th><th>Estado</th><th>Ligações</th><th>Famílias</th><th>Receita</th><th>Responsável</th></tr></thead>
+      <tbody>${items.map(m => `<tr><td>${(m.data_monitoria||'').substring(0,10)}</td><td><strong>${m.saa_codigo||''}</strong></td><td>${tagEstado(m.estado)}</td><td>${m.n_ligdom||0}</td><td>${m.n_ben_fami||0}</td><td>${m.rec_m_mzn?Number(m.rec_m_mzn).toLocaleString('pt-PT'):''}</td><td>${m.nom_respon||''}</td></tr>`).join('')}</tbody></table>`;
+  };
+  document.getElementById('b-filter').onclick = load;
+  await load();
+}
+
+async function renderMonitoriaForm(app) {
+  app.innerHTML = `
+    <div class="card"><h2>Registar Monitoria de SAA</h2>
+    <form id="form">
+      <div class="field"><label>Código do SAA <span class="req">*</span></label><input name="saa_codigo" required></div>
+      <div class="field"><label>Data <span class="req">*</span></label><input type="date" name="data_monitoria" required></div>
+      <div class="field"><label>Estado <span class="req">*</span></label><select name="estado" required><option value="">--</option><option>Operacional</option><option>Parcialmente Operacional</option><option>Avariado</option><option>Desactivado</option></select></div>
+      <div class="field"><label>Condutividade µS/cm</label><input type="number" name="cond_us_cm" min="0"></div>
+      <div class="field"><label>Sabor</label><select name="sabor_agua"><option value="">--</option><option>Insípida</option><option>Salgada</option><option>Doce</option><option>Amarga</option></select></div>
+      <div class="field"><label>Cor</label><select name="cor_agua"><option value="">--</option><option>Clara</option><option>Turva</option><option>Amarelada</option><option>Castanha</option></select></div>
+      <div class="field"><label>Cheiro</label><select name="cheir_agua"><option value="">--</option><option>Sem_cheiro</option><option>Cloro</option><option>Esgoto</option><option>Outro</option></select></div>
+      <div class="field"><label>Famílias beneficiárias</label><input type="number" name="n_ben_fami" min="0"></div>
+      <div class="field"><label>Pessoas beneficiárias</label><input type="number" name="n_ben_pess" min="0"></div>
+      <div class="field"><label>Responsável</label><input name="nom_respon"></div>
+      <div class="field"><label>Ligações domiciliárias</label><input type="number" name="n_ligdom" min="0"></div>
+      <div class="field"><label>Torneiras de quintal</label><input type="number" name="n_torqui" min="0"></div>
+      <div class="field"><label>Fontanários</label><input type="number" name="n_fontan" min="0"></div>
+      <div class="field"><label>Tipo de facturação</label><select name="tipo_fact"><option value="">--</option><option>Contador_(m3)</option><option>Bidão</option><option>Fixo</option><option>Sem_facturação</option></select></div>
+      <div class="field"><label>Receita mensal (MZN)</label><input type="number" step="0.01" name="rec_m_mzn"></div>
+      <div class="field full" style="display:flex;gap:0.5rem;"><button class="btn btn-primary" type="submit">Gravar</button><a class="btn btn-secondary" href="#/monitorias">Cancelar</a></div>
+    </form><div id="msg"></div></div>`;
+  document.getElementById('form').onsubmit = async (e) => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target).entries());
+    const msg = document.getElementById('msg'); msg.innerHTML = '<div class="loading">A submeter…</div>';
+    try { const r = await Api.monitorias.create(body); msg.innerHTML = `<div class="alert alert-success">Monitoria registada (id ${r.id}).</div>`; e.target.reset(); }
+    catch (err) { msg.innerHTML = `<div class="alert alert-error"><strong>${err.payload?.title || 'Erro'}</strong>: ${err.message}</div>`; }
+  };
+}
+
+async function renderRelatorios(app) {
+  app.innerHTML = `
+    <div class="card"><h2>Relatórios</h2>
+    <form id="form-rel">
+      <div class="field"><label>Entidade</label><select name="entidade"><option value="fonte">Fontes Dispersas</option><option value="saa">SAA</option><option value="monitoria">Monitorias</option></select></div>
+      <div class="field"><label>Distrito (opcional)</label><input name="distrito"></div>
+      <div class="field full" style="display:flex;gap:0.5rem;"><button class="btn btn-primary" id="b-pdf">PDF</button><button class="btn btn-secondary" id="b-xlsx">Excel</button></div>
+    </form><div id="msg"></div></div>`;
+  const click = async (fmt) => {
+    const fd = new FormData(document.getElementById('form-rel'));
+    try { await Exportar[fmt](fd.get('entidade'), { distrito: fd.get('distrito') }); }
+    catch (e) { document.getElementById('msg').innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+  };
+  document.getElementById('b-pdf').onclick  = (e) => { e.preventDefault(); click('pdf'); };
+  document.getElementById('b-xlsx').onclick = (e) => { e.preventDefault(); click('xlsx'); };
+}
+
+async function renderAdmin(app) {
+  if (!Auth.hasPerfil('ADMINISTRADOR')) { app.innerHTML = '<div class="alert alert-error">Acesso restrito.</div>'; return; }
+  app.innerHTML = `
+    <div class="card"><h2>Utilizadores</h2>
+    <form id="f-user">
+      <div class="field"><label>E-mail</label><input name="email" required></div>
+      <div class="field"><label>Nome</label><input name="nome"></div>
+      <div class="field"><label>Perfil</label><select name="perfil"><option>ADMINISTRADOR</option><option>TEC_CADASTRO</option><option>TEC_MONITORIA</option><option>GESTOR</option></select></div>
+      <div class="field"><button class="btn btn-primary" type="submit">Adicionar / actualizar</button></div>
+    </form>
+    <div id="msg"></div>
+    <h3>Utilizadores cadastrados</h3><div id="lista-users"></div></div>
+    <div class="card"><h2>Tabela AKVO Cascade</h2>
+    <p>Carregue um CSV ou Excel com colunas <code>provincia,distrito,posto,localidade</code>.</p>
+    <div class="field"><input type="file" id="cascade-file" accept=".csv,.xlsx"></div>
+    <button class="btn btn-primary" id="b-upload">Carregar</button><div id="cascade-msg"></div></div>`;
+  const refresh = async () => {
+    const { items } = await Api.admin.users();
+    document.getElementById('lista-users').innerHTML = `<table><thead><tr><th>E-mail</th><th>Nome</th><th>Perfil</th><th>Activo</th></tr></thead>
+      <tbody>${items.map(u => `<tr><td>${u.email}</td><td>${u.nome||''}</td><td>${u.perfil}</td><td>${u.activo}</td></tr>`).join('')}</tbody></table>`;
+  };
+  await refresh();
+  document.getElementById('f-user').onsubmit = async (e) => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target).entries());
+    try { await Api.admin.upsert(body); document.getElementById('msg').innerHTML = '<div class="alert alert-success">Gravado.</div>'; await refresh(); }
+    catch (err) { document.getElementById('msg').innerHTML = `<div class="alert alert-error">${err.message}</div>`; }
+  };
+  document.getElementById('b-upload').onclick = async () => {
+    const file = document.getElementById('cascade-file').files[0]; if (!file) return;
+    const buf = await file.arrayBuffer();
+    let rows = [];
+    if (file.name.toLowerCase().endsWith('.xlsx')) {
+      const wb = XLSX.read(buf); rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+    } else {
+      const text = new TextDecoder().decode(buf);
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      const headers = lines.shift().split(',').map(h => h.trim());
+      rows = lines.map(l => { const parts = l.split(','); const o = {}; headers.forEach((h,i) => o[h] = (parts[i]||'').trim()); return o; });
+    }
+    try { const r = await Api.cascade.upload(rows); document.getElementById('cascade-msg').innerHTML = `<div class="alert alert-success">${r.linhasGravadas} linhas carregadas.</div>`; }
+    catch (err) { document.getElementById('cascade-msg').innerHTML = `<div class="alert alert-error">${err.message}</div>`; }
+  };
+}
+
+// ===================== ROUTER =====================
+const routes = {
+  '/login':            renderLogin,
+  '/dashboard':        renderDashboard,
+  '/fontes':           renderFontes,
+  '/fontes/nova':      renderFonteForm,
+  '/saa':              renderSaa,
+  '/saa/novo':         renderSaaForm,
+  '/monitorias':       renderMonitorias,
+  '/monitorias/nova':  renderMonitoriaForm,
+  '/relatorios':       renderRelatorios,
+  '/admin':            renderAdmin
+};
+
+function setNav(active) {
+  const nav = document.getElementById('nav');
+  const links = [
+    ['#/dashboard', 'Dashboard'], ['#/fontes', 'Fontes'], ['#/saa', 'SAA'],
+    ['#/monitorias','Monitorias'], ['#/relatorios','Relatórios']
+  ];
+  if (Auth.hasPerfil('ADMINISTRADOR')) links.push(['#/admin', 'Admin']);
+  nav.innerHTML = links.map(([h, t]) => `<a href="${h}" class="${active === h.substring(1) ? 'active' : ''}">${t}</a>`).join('');
+  nav.classList.remove('hidden');
+}
+
+function setUserBar() {
+  const ub = document.getElementById('userbar');
+  const u = Auth.current();
+  if (!u) { ub.innerHTML = ''; return; }
+  ub.innerHTML = `<span>${u.nome || u.email}</span><span class="badge">${u.perfil}</span>`;
+}
+
+async function router() {
+  const app = document.getElementById('app');
+  const hash = window.location.hash.substring(1) || '/dashboard';
+  if (!Auth.current()) {
+    try { await Auth.load(); }
+    catch (e) {
+      app.innerHTML = `<div class="alert alert-error"><strong>${e.payload?.title || 'Erro'}</strong>: ${e.message}</div>`;
+      return;
+    }
+  }
+  const route = routes[hash] || renderDashboard;
+  setNav(hash); setUserBar();
+  app.innerHTML = '<div class="loading">A carregar…</div>';
+  try { await route(app); }
+  catch (e) { app.innerHTML = `<div class="alert alert-error"><strong>Erro:</strong> ${e.message}</div>`; }
+}
+
+window.addEventListener('hashchange', router);
+window.addEventListener('load', router);
+</script>
+</body>
+</html>
