@@ -103,23 +103,18 @@ const CONFIG = {
   ORGANIZATION: 'Direcção Provincial de Obras Públicas, Habitação e Recursos Hídricos de Gaza'
 };
 
-// ===================== API (mesmo origem, sem CORS) =====================
-async function apiCall(path, payload, opts) {
-  opts = opts || {};
-  const url = window.location.pathname + '?_path=' + encodeURIComponent(path);
-  const init = { method: 'POST', credentials: 'same-origin' };
-  init.body = JSON.stringify(payload || {});
-  init.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
-  const res = await fetch(url, init);
-  const text = await res.text();
-  let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
-  if (!res.ok || (data && data.status >= 400)) {
-    const err = new Error((data && (data.detail || data.title)) || ('HTTP ' + res.status));
-    err.status = (data && data.status) || res.status;
-    err.payload = data;
-    throw err;
-  }
-  return data;
+// ===================== API (google.script.run, nativo do HtmlService) =====================
+function apiCall(path, payload) {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler((err) => {
+        const e = new Error(err.message || 'Erro de comunicação');
+        e.payload = { title: err.name || 'Erro', detail: err.message };
+        reject(e);
+      })
+      .handleApi(path, payload || {});
+  });
 }
 
 const Api = {
@@ -577,8 +572,23 @@ async function router() {
   catch (e) { app.innerHTML = `<div class="alert alert-error"><strong>Erro:</strong> ${e.message}</div>`; }
 }
 
+// Interceptar cliques em links de hash para evitar que o base target="_top"
+// rompa o iframe do HtmlService
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a) return;
+  e.preventDefault();
+  const newHash = a.getAttribute('href').substring(1);
+  if (window.location.hash === '#' + newHash) {
+    router();           // mesmo hash, força re-render
+  } else {
+    window.location.hash = newHash;
+  }
+});
+
 window.addEventListener('hashchange', router);
 window.addEventListener('load', router);
 </script>
 </body>
 </html>
+
