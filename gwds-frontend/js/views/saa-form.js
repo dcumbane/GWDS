@@ -28,8 +28,8 @@ export async function renderSaaForm(app) {
         <div class="field"><label>Comprimento rede (m)</label><input type="number" name="l_rede_m"></div>
         <div class="field"><label>Tipo energia</label><input name="tipo_energ"></div>
         <div class="field"><label>Tipo captação 1</label><input name="tipocap_c1"></div>
-        <div class="field"><label>Longitude WGS84 <span class="req">*</span></label><input type="number" step="0.0000001" name="x_wgs84" required id="lon"></div>
-        <div class="field"><label>Latitude WGS84 <span class="req">*</span></label><input type="number" step="0.0000001" name="y_wgs84" required id="lat"></div>
+        <div class="field"><label>Longitude WGS84 <span class="req">*</span></label><input type="number" step="any" name="x_wgs84" required id="lon"></div>
+        <div class="field"><label>Latitude WGS84 <span class="req">*</span></label><input type="number" step="any" name="y_wgs84" required id="lat"></div>
         <div class="field"><label>X UTM</label><input name="x_utm" readonly></div>
         <div class="field"><label>Y UTM</label><input name="y_utm" readonly></div>
         <div class="field full" style="display:flex; gap:0.5rem;">
