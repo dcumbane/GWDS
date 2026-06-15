@@ -37,8 +37,8 @@ export async function renderFonteForm(app) {
           <select name="tipo_energ"><option value="">--</option><option>Manual</option><option>EDM</option><option>Solar</option><option>Gerador</option><option>Não_aplicável</option></select>
         </div>
 
-        <div class="field"><label>Longitude WGS84 <span class="req">*</span></label><input type="number" step="0.0000001" name="x_wgs84" required id="lon"></div>
-        <div class="field"><label>Latitude WGS84 <span class="req">*</span></label><input type="number" step="0.0000001" name="y_wgs84" required id="lat"></div>
+        <div class="field"><label>Longitude WGS84 <span class="req">*</span></label><input type="number" step="any" name="x_wgs84" required id="lon"></div>
+        <div class="field"><label>Latitude WGS84 <span class="req">*</span></label><input type="number" step="any" name="y_wgs84" required id="lat"></div>
         <div class="field"><label>X UTM</label><input name="x_utm" readonly></div>
         <div class="field"><label>Y UTM</label><input name="y_utm" readonly></div>
         <div class="field full"><label>Observações</label><textarea name="obs_lev"></textarea></div>
